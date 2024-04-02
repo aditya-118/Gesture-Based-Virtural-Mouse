@@ -57,7 +57,7 @@ for label in Labels:
         cv.imshow("Video Window", frame)
         
         #Store the image to specific label folder
-        cv.imwrite(label+'/img'+str(count)+'.png',frame)
+        cv.imwrite(DatasetDir+label+'/img'+str(count)+'.png',frame)
         count += 1
         # to quit the display window press 'q'
         if cv.waitKey(5) & 0xFF == 13:

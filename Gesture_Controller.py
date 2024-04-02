@@ -595,7 +595,7 @@ class GestureController:
         print("1")
 
         options = GestureRecognizerOptions(
-            base_options=BaseOptions(model_asset_path='mouse_gesture_recognizer.task',delegate='GPU'),
+            base_options=BaseOptions(model_asset_path='Model/gesture_recognizer.task',delegate='GPU'),
             running_mode=VisionRunningMode.LIVE_STREAM,
             result_callback=self.store_result,
             num_hands = 2,
