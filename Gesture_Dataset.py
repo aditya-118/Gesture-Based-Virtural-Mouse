@@ -1,6 +1,7 @@
 import cv2 as cv
 import os
 import time
+import zipfile
 
 #argument 0 is given to use the default camera of the laptop
 camera = cv.VideoCapture(0)
@@ -27,7 +28,7 @@ print("Gestures to be recorded are")
 for label in Labels:
     print(label)
 
-DatasetDir = 'C:\\Users\\bansa\\Project\\Gesture-Controlled-Virtual-Mouse\\Dataset\\'
+DatasetDir = 'Dataset\\'
 print(os.listdir(DatasetDir))
 #Now create folders for each label to store images
 for label in Labels:
@@ -65,3 +66,15 @@ for label in Labels:
 # When everything done, release the capture
 camera.release()
 cv.destroyAllWindows()
+
+if os.path.exists("dataset.zip"):
+  os.remove("dataset.zip") # one file at a time
+
+with zipfile.ZipFile("dataset.zip", 'w') as zip_object:
+   # Traverse all files in directory
+   for folder_name, sub_folders, file_names in os.walk(DatasetDir):
+      for filename in file_names:
+         # Create filepath of files in directory
+         file_path = os.path.join(folder_name, filename)
+         # Add files to zip file
+         zip_object.write(file_path, os.path.basename(folder_name)+'\\'+os.path.basename(filename),compress_type=zipfile.ZIP_DEFLATED)
