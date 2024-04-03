@@ -27,28 +27,28 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 def get_epochtime_ms():
     return round(datetime.utcnow().timestamp() * 1000)
 # Gesture Encodings 
-class Gest(IntEnum):
+class Gest():
     # Binary Encoded
     """
-    Enum for mapping all hand gesture to binary number.
+    Mapping all hand gesture to binary number.
     """
 
-    FIST = 0
-    PINKY = 1
-    RING = 2
-    # MID = 'left_click'
-    LAST3 = 7
-    # INDEX = 'right_click'
-    FIRST2 = 12
-    LAST4 = 15
-    THUMB = 16    
-    PALM = 31
+    FIST = 'drag'
+    # PINKY = 1
+    # RING = 2
+    MID = 'left_click'
+    # LAST3 = 7
+    INDEX = 'right_click'
+    # FIRST2 = 12
+    # LAST4 = 15
+    # THUMB = 16    
+    PALM = 'stop'
     
     # Extra Mappings
-    # V_GEST = "mouse_move"
-    TWO_FINGER_CLOSED = 34
-    PINCH_MAJOR = 35
-    PINCH_MINOR = 36
+    V_GEST = "mouse_move"
+    # TWO_FINGER_CLOSED = 34
+    PINCH_MAJOR = 'volume'
+    PINCH_MINOR = 'scroll'
 
 # Multi-handedness Labels
 class HLabel(IntEnum):
@@ -92,15 +92,7 @@ class HandRecog:
         self.hand_label = hand_label
     
     def update_hand_result(self, hand_result):
-        # if(hand_result):
-        #     hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
-
-        #     hand_landmarks_proto.landmark.extend([
-        #         landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in hand_result
-        #     ])
-        #     self.hand_result = hand_landmarks_proto
-        # else: 
-            self.hand_result = hand_result
+        self.hand_result = hand_result
 
     def get_signed_dist(self, point):
         """
@@ -189,9 +181,9 @@ class HandRecog:
     
 
     # Handling Fluctations due to noise
-    def get_gesture(self):
+    def get_gesture(self, gestures):
         """
-        returns int representing gesture corresponding to Enum 'Gest'.
+        returns int representing gesture corresponding to 'Gest'.
         sets 'frame_count', 'ori_gesture', 'prev_gesture', 
         handles fluctations due to noise.
         
@@ -202,28 +194,15 @@ class HandRecog:
         if self.hand_result == None:
             return Gest.PALM
 
+        gest_name = getattr(gestures[0],"category_name")
         current_gesture = Gest.PALM
-        if self.finger in [Gest.LAST3,Gest.LAST4] and self.get_dist([8,4]) < 0.05:
+        if gest_name == Gest.PINCH_MINOR:
             if self.hand_label == HLabel.MINOR :
                 current_gesture = Gest.PINCH_MINOR
             else:
                 current_gesture = Gest.PINCH_MAJOR
-
-        elif Gest.FIRST2 == self.finger :
-            point = [[8,12],[5,9]]
-            dist1 = self.get_dist(point[0])
-            dist2 = self.get_dist(point[1])
-            ratio = dist1/dist2
-            if ratio > 1.7:
-                current_gesture = "mouse_move"
-            else:
-                if self.get_dz([8,12]) < 0.1:
-                    current_gesture =  Gest.TWO_FINGER_CLOSED
-                else:
-                    current_gesture = 'left_click'
-            
         else:
-            current_gesture =  self.finger
+            current_gesture = gest_name
         
         if current_gesture == self.prev_gesture:
             self.frame_count += 1
@@ -438,7 +417,6 @@ class Controller:
     def handle_controls(gesture, hand_result):  
         """Impliments all gesture functionality."""      
         x,y = None,None
-        print('gesture, hand_result',gesture, hand_result)
         if gesture != Gest.PALM :
             x,y = Controller.get_position(hand_result)
         
@@ -454,7 +432,7 @@ class Controller:
             Controller.pinchminorflag = False
 
         # implementation
-        if gesture == "mouse_move":
+        if gesture == Gest.V_GEST:
             Controller.flag = True
             pyautogui.moveTo(x, y, duration = 0.1)
 
@@ -464,17 +442,17 @@ class Controller:
                 pyautogui.mouseDown(button = "left")
             pyautogui.moveTo(x, y, duration = 0.1)
 
-        elif gesture == 'left_click' and Controller.flag:
+        elif gesture == Gest.MID and Controller.flag:
             pyautogui.click()
             Controller.flag = False
 
-        elif gesture == 'right_click' and Controller.flag:
+        elif gesture == Gest.INDEX and Controller.flag:
             pyautogui.click(button='right')
             Controller.flag = False
 
-        elif gesture == Gest.TWO_FINGER_CLOSED and Controller.flag:
-            pyautogui.doubleClick()
-            Controller.flag = False
+        # elif gesture == Gest.TWO_FINGER_CLOSED and Controller.flag:
+        #     pyautogui.doubleClick()
+        #     Controller.flag = False
 
         elif gesture == Gest.PINCH_MINOR:
             if Controller.pinchminorflag == False:
@@ -541,32 +519,52 @@ class GestureController:
         hand obtained from mediapipe, uses 'dom_hand' to decide major and
         minor hand.
         """
-        left , right = None,None
+        left = {
+            'landmarks': None,
+            'gestures': None,
+        }
+        right = {
+            'landmarks': None,
+            'gestures': None,
+        }
         try:
             handedness_class = results.handedness[0][0]
             if getattr(handedness_class,"category_name") == 'Right':
-                left = results.hand_landmarks[0]
+                left = {
+                    'landmarks': results.hand_landmarks[0],
+                    'gestures': results.gestures[0],
+                }
             else :
-                right = results.hand_landmarks[0]
+                right = {
+                    'landmarks': results.hand_landmarks[0],
+                    'gestures': results.gestures[0],
+                }
         except:
             pass
 
         try:
             handedness_class = results.handedness[1][0]
             if getattr(handedness_class,"category_name") == 'Right':
-                left = results.hand_landmarks[1]
+                left = {
+                    'landmarks': results.hand_landmarks[1],
+                    'gestures': results.gestures[1],
+                }
             else :
-                right = results.hand_landmarks[1]
+                right = {
+                    'landmarks': results.hand_landmarks[1],
+                    'gestures': results.gestures[1],
+                }
         except:
             pass
-        
+
         if GestureController.dom_hand == True:
             GestureController.hr_major = right
             GestureController.hr_minor = left
         else :
             GestureController.hr_major = left
             GestureController.hr_minor = right
-    def trnasfromLandmarks(self, result):
+    
+    def transfromLandmarks(self, result):
         for index in range(len(result.hand_landmarks)):
             hand_landmarks = result.hand_landmarks[index]
             hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
@@ -578,10 +576,7 @@ class GestureController:
         self.recognition_result = result
         
     def store_result(self,result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
-        # print('gesture recognition result: {}'.format(result.handedness))
-        # print('gesture recognition result: {}'.format(result.gestures))
-        # print(inspect.getmembers(output_image))
-        self.trnasfromLandmarks(result)
+        self.transfromLandmarks(result)
 
     def start(self):
         """
@@ -592,7 +587,6 @@ class GestureController:
         print("Starting")
         handmajor = HandRecog(HLabel.MAJOR)
         handminor = HandRecog(HLabel.MINOR)
-        print("1")
 
         options = GestureRecognizerOptions(
             base_options=BaseOptions(model_asset_path='Model/gesture_recognizer.task',delegate='GPU'),
@@ -603,16 +597,8 @@ class GestureController:
             min_hand_presence_confidence=0.5)
 
         with GestureRecognizer.create_from_options(options) as recognizer:
-
-            # do your work here
-            # end_time = datetime.now()
-            print("2")
-            # print('Duration: {}'.format(end_time - start_time))
             while GestureController.cap.isOpened() and GestureController.gc_mode:
-                # print("3")
                 success, image = GestureController.cap.read()
-                # print(image)
-                # print("4")
                 if not success:
                     print("Ignoring empty camera frame.")
                     continue
@@ -625,22 +611,21 @@ class GestureController:
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
                 if self.recognition_result and self.recognition_result.hand_landmarks:
-                    print("5")        
                     GestureController.classify_hands(self.recognition_result)
 
-                    handmajor.update_hand_result(GestureController.hr_major)
-                    handminor.update_hand_result(GestureController.hr_minor)
+                    handmajor.update_hand_result(GestureController.hr_major['landmarks'])
+                    handminor.update_hand_result(GestureController.hr_minor['landmarks'])
 
                     handmajor.set_finger_state()
                     handminor.set_finger_state()
-                    # gest_name = handminor.get_gesture()
-                    gest_name = getattr(self.recognition_result.gestures[0][0],"category_name")
+                    gest_name = None
+                    if (GestureController.hr_minor != None):
+                        gest_name = handminor.get_gesture(GestureController.hr_minor['gestures'])
 
-                    # if gest_name == Gest.PINCH_MINOR:
-                    #     Controller.handle_controls(gest_name, handminor.hand_result)
-                    # else:
-                    # gest_name = handmajor.get_gesture()
-                    if GestureController.hr_major:
+                    if gest_name == Gest.PINCH_MINOR:
+                        Controller.handle_controls(gest_name, handminor.hand_result)
+                    else:
+                        gest_name = handmajor.get_gesture(GestureController.hr_major['gestures'])
                         Controller.handle_controls(gest_name, handmajor.hand_result)
                     
                     for hand_landmarks in self.recognition_result.hand_landmarks:
@@ -653,9 +638,7 @@ class GestureController:
         GestureController.cap.release()
         cv2.destroyAllWindows()
 
-# uncomment to run directly
 print("Start")
-# start_time = datetime.utcnow().t
 gc1 = GestureController()
 print("Initialised")
 gc1.start()
